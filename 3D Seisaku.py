@@ -192,7 +192,7 @@ class MyApp:
                     rows = reader[1:]
                 
                 # Update the specific row (remember index is relative to data, not header)
-                rows[self.editing_index] = [date, data["product"], data["time"], data["filament"], data["weight"]+" g", data["class"], data["maker"]]
+                rows[self.editing_index] = [date, data["product"], data["time"]+ " h", data["filament"], data["weight"]+" g", data["class"], data["maker"]]
                 
                 with open(file_path, mode="w", newline="", encoding="utf-8-sig") as file:
                     writer = csv.writer(file)
