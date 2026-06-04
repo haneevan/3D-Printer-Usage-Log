@@ -651,10 +651,10 @@ class VirtualKeyboard(tk.Frame):
         # --- Top Blank Canvas Area ---
         canvas_frame = tk.Frame(self.tab_jp, bg="white", highlightbackground="#CCCCCC", highlightthickness=1)
         canvas_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(10, 5))
-        
+        """
         clear_text_btn = tk.Button(canvas_frame, text="✖", relief="flat", bg="white", font=("Arial", 12, "bold"), command=self.clear_field)
         clear_text_btn.pack(side="top", anchor="ne", padx=5, pady=5)
-
+        """
         # Allow basic pen drawing in the blank space
         self.drawing_canvas = tk.Canvas(canvas_frame, bg="white", highlightthickness=0)
         self.drawing_canvas.pack(fill=tk.BOTH, expand=True)
@@ -662,8 +662,8 @@ class VirtualKeyboard(tk.Frame):
         self.drawing_canvas.bind("<B1-Motion>", self.paint)
         self.drawing_canvas.bind("<ButtonRelease-1>", self.end_stroke)
         
-        clear_canvas_btn = tk.Button(canvas_frame, text="🗑", relief="flat", bg="white", command=self.clear_handwriting)
-        clear_canvas_btn.pack(side="bottom", anchor="sw", padx=5, pady=5)
+        clear_canvas_btn = tk.Button(canvas_frame, text="削除", relief="flat", bg="white", command=self.clear_handwriting)
+        clear_canvas_btn.pack(side="top", anchor="sw", padx=5, pady=5)
 
         # --- Suggestion Row (Replacing Punctuation) ---
         self.suggestion_frame = tk.Frame(self.tab_jp, bg="#F5F5F5")
