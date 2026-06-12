@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import tkinter as tk
 from tkinter import messagebox, ttk
 import csv
@@ -1222,7 +1221,7 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = MyApp(root)
     root.mainloop()
-=======
+
 import tkinter as tk
 from tkinter import messagebox, ttk
 import csv
@@ -2041,4 +2040,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = MyApp(root)
     root.mainloop()
->>>>>>> origin/main
+
