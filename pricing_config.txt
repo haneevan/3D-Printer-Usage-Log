@@ -1,0 +1,5 @@
+PLA=2800
+ABS=3400
+PC=7280
+PET-CF=18360
+electricity_per_hour=15

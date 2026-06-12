@@ -11,6 +11,7 @@ try:
 except ImportError:
     requests = None
 import json
+from tkcalendar import DateEntry
 
 # --- Font Fallback Configurations ---
 import matplotlib
@@ -37,16 +38,59 @@ class MyApp:
         self.editing_row_data = None 
         self.dept_db = self.load_dept_database()
 
-        # Material Prices per kg
-        self.material_prices = {
-            "PLA": 2800, "ABS": 3400, "PC": 7280, "PET-CF": 18360
-        }
-        self.elec_cost_per_hour = 15 
+        # --- DYNAMICALLY LOAD PRICING ARRAYS FROM FILE ---
+        pricing_data = self.load_pricing_config()
+        
+        # Pull out electricity cost separately
+        self.elec_cost_per_hour = pricing_data.pop("electricity_per_hour", 15)
+        # The remaining dictionary keys are your material per-kg prices
+        self.material_prices = pricing_data
 
         self.setup_styles()
         self.setup_main_ui()
         self.load_history()
         self.setup_edit_tab()
+
+
+    def load_pricing_config(self):
+        """Loads material prices per kg and electricity cost from disk. Uses defaults if missing."""
+        import os
+        filename = "pricing_config.txt"
+        defaults = {
+            "PLA": "2800",
+            "ABS": "3400",
+            "PC": "7280",
+            "PET-CF": "18360",
+            "electricity_per_hour": "15"
+        }
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                for k, v in defaults.items():
+                    f.write(f"{k}={v}\n")
+            # Convert values to integers for application memory
+            return {k: int(v) for k, v in defaults.items()}
+            
+        pricing = {}
+        with open(filename, "r", encoding="utf-8") as f:
+            for line in f:
+                if "=" in line:
+                    k, v = line.strip().split("=", 1)
+                    try:
+                        pricing[k] = int(v)
+                    except ValueError:
+                        pricing[k] = 0
+        
+        # Ensure fallback defaults exist if keys were missing or broken in file
+        for k, v in defaults.items():
+            if k not in pricing:
+                pricing[k] = int(v)
+        return pricing
+
+    def save_pricing_config(self, pricing_dict):
+        """Saves current memory pricing variables back into the text file."""
+        with open("pricing_config.txt", "w", encoding="utf-8") as f:
+            for k, v in pricing_dict.items():
+                f.write(f"{k}={v}\n")
 
     def load_dept_database(self):
         db = {}
@@ -175,6 +219,9 @@ class MyApp:
             "label_font": TK_FONT_BOLD,
             "entry_font": TK_FONT_REGULAR
         }
+        
+        from tkcalendar import DateEntry
+        from datetime import datetime
 
         # Main split container for input form (left) and keyboard (right)
         split_container = tk.Frame(self.input_frame, bg=TAB_ACTIVE_BG)
@@ -189,62 +236,79 @@ class MyApp:
         container = tk.Frame(left_pane, bg=TAB_ACTIVE_BG, padx=40, pady=20)
         container.pack(expand=True) 
 
-        tk.Label(container, text="製作日:", bg=TAB_ACTIVE_BG, font=UI_CONFIG["label_font"]).grid(row=0, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
-        self.date_entry = tk.Entry(container, width=UI_CONFIG["entry_width"], font=UI_CONFIG["entry_font"], fg="grey")
-        self.date_entry.insert(0, "YYYY/MM/DD (空欄で今日)")
-        self.date_entry.grid(row=0, column=1, sticky="w", padx=10)
-        self.date_entry.bind("<FocusIn>", lambda e: self.on_date_focus_in())
-
+        # Unified UI Mapping Dictionary
         self.fields = {
-            "product": "品名:", "filament": "素材:", "color": "色:", 
-            "weight": "使用量 (g):", "class": "区分:", "maker": "製作者:"
+            "date": "製作日:", "product": "品名:", "filament": "素材:", 
+            "color": "色:", "weight": "使用量 (g):", "class": "区分:", "maker": "製作者:"
         }
         self.entries = {}
         
-        row_map = ["product", "time_placeholder", "filament", "color", "weight", "class", "maker"]
-        for i, key in enumerate(row_map, start=1):
+        # --- FIXED ROW MAP: Unifies "date" loop creation at row index 0 ---
+        row_map = ["date", "product", "time_placeholder", "filament", "color", "weight", "class", "maker"]
+        
+        for i, key in enumerate(row_map):
             if key == "time_placeholder":
                 tk.Label(container, text="製作時間:", bg=TAB_ACTIVE_BG, font=UI_CONFIG["label_font"]).grid(row=i, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
                 time_frame = tk.Frame(container, bg=TAB_ACTIVE_BG)
                 time_frame.grid(row=i, column=1, sticky="w", padx=10)
+                
                 self.hour_entry = tk.Entry(time_frame, width=10, font=UI_CONFIG["entry_font"])
                 self.hour_entry.pack(side=tk.LEFT)
                 tk.Label(time_frame, text=" h   ", bg=TAB_ACTIVE_BG, font=UI_CONFIG["entry_font"]).pack(side=tk.LEFT)
+                
                 self.min_entry = tk.Entry(time_frame, width=10, font=UI_CONFIG["entry_font"])
                 self.min_entry.pack(side=tk.LEFT)
                 tk.Label(time_frame, text=" m", bg=TAB_ACTIVE_BG, font=UI_CONFIG["entry_font"]).pack(side=tk.LEFT)
                 continue
 
+            # Standard Label Generation
             tk.Label(container, text=self.fields[key], bg=TAB_ACTIVE_BG, font=UI_CONFIG["label_font"]).grid(row=i, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
             
-            # --- FIXED LOOP CONDITION LOGIC ---
-            # --- UPDATED: Turning fields into Dropdowns dynamically ---
-            if key == "class":
+            # --- FIXED SELECTION STRUCT (if / elif / else chain) ---
+            if key == "date":
+                ent = DateEntry(
+                    container, 
+                    width=UI_CONFIG["entry_width"] - 3, 
+                    font=UI_CONFIG["entry_font"],
+                    background='darkblue', 
+                    foreground='white', 
+                    borderwidth=2,
+                    date_pattern='yyyy/m/d'
+                )
+                ent.set_date(datetime.now())
+                self.date_entry = ent  # Maintained assignment shortcut safely
+                
+            elif key == "class":
                 ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
                 current_options = self.load_classifications()
                 ent['values'] = tuple(current_options)
                 if current_options: ent.current(0)
+                
             elif key == "filament":
                 ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
                 current_materials = self.load_materials()
                 ent['values'] = tuple(current_materials)
                 if current_materials: ent.current(0)
+                
             elif key == "color":
                 ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
                 current_colors = self.load_colors()
                 ent['values'] = tuple(current_colors)
                 if current_colors: ent.current(0)
+                
             elif key == "maker":
                 ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
                 current_producers = self.load_producers()
                 ent['values'] = tuple(current_producers)
                 if current_producers: ent.current(0)
+                
             else:
                 ent = tk.Entry(container, width=UI_CONFIG["entry_width"], font=UI_CONFIG["entry_font"])
                 
             ent.grid(row=i, column=1, sticky="w", padx=10)
             self.entries[key] = ent
 
+        # Department Code Frame Elements
         tk.Label(container, text="部署コード:", font=UI_CONFIG["label_font"], bg=TAB_ACTIVE_BG).grid(row=8, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
         self.code_var = tk.StringVar()
         self.trace_id = self.code_var.trace_add("write", self.update_dept_display)
@@ -257,20 +321,16 @@ class MyApp:
         self.save_button = tk.Button(container, text="データ保存", command=self.save_data, bg="#5CB85C", fg="white", width=30, font=TK_FONT_BOLD)
         self.save_button.grid(row=10, column=0, columnspan=2, pady=20)
         
-        # --- KEYPAD BINDINGS FOR TEXT ENTRY ---
-        self.date_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.date_entry))
+        # --- CLEANED KEYPAD BINDINGS ---
+        # Bound ONLY to writable text fields. Dropped dropdown menus and the calendar component.
         self.entries["product"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["product"]))
         self.hour_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.hour_entry))
         self.min_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.min_entry))
-        # --- REMOVED HERE: The keyboard binding for self.entries["filament"] has been deleted ---
-        self.entries["color"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["color"]))
         self.entries["weight"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["weight"]))
-        # --- REMOVED HERE: The keyboard binding for self.entries["class"] has been deleted ---
-        self.entries["maker"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["maker"]))
         self.code_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.code_entry))
 
         # Initialize and embed the keyboard UI
-        self.keyboard_ui = VirtualKeyboard(right_pane, self.date_entry)
+        self.keyboard_ui = VirtualKeyboard(right_pane, self.entries["product"])
         self.keyboard_ui.pack(fill=tk.BOTH, expand=True)
 
     def show_keyboard(self, entry):
@@ -733,36 +793,73 @@ class MyApp:
         self.sub_notebook = ttk.Notebook(left_pane)
         self.sub_notebook.pack(fill=tk.BOTH, expand=True)
 
-        # Generate the 4 Configuration Frames
+        # Setup Five Sub-Frames (Added Cost Panel)
         self.sub_class_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_mat_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_color_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_maker_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
+        self.sub_cost_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10) # <-- New!
 
         self.sub_notebook.add(self.sub_class_frame, text=" 区分設定 ")
         self.sub_notebook.add(self.sub_mat_frame, text=" 素材設定 ")
         self.sub_notebook.add(self.sub_color_frame, text=" 色設定 ")
         self.sub_notebook.add(self.sub_maker_frame, text=" 製作者設定 ")
+        self.sub_notebook.add(self.sub_cost_frame, text=" コスト設定 ") # <-- New!
 
-        # Build UI onto frames using a type tracking tag ("class", "material", "color", "maker")
+        # Build UI onto frames using type tracking flags
         self.build_list_manager_ui(self.sub_class_frame, list_type="class")
         self.build_list_manager_ui(self.sub_mat_frame, list_type="material")
         self.build_list_manager_ui(self.sub_color_frame, list_type="color")
         self.build_list_manager_ui(self.sub_maker_frame, list_type="maker")
+        self.build_list_manager_ui(self.sub_cost_frame, list_type="cost") # <-- New!
 
         # Set default focus field for keyboard to class input
         self.edit_keyboard_ui = VirtualKeyboard(right_pane, self.class_entry)
         self.edit_keyboard_ui.pack(fill=tk.BOTH, expand=True)
 
     def build_list_manager_ui(self, parent_frame, list_type="class"):
-        """Cleaner factory method tracking list structures across 4 custom variations."""
-        title_map = {
-            "class": "区分リストの編集",
-            "material": "素材リストの編集",
-            "color": "色リストの編集",
-            "maker": "製作者リストの編集"
-        }
+        """Factory method structural pattern modified to handle core text logs and numeric cost management."""
         
+        # --- NEW COST INTERFACE LOGIC BLOCK ---
+        if list_type == "cost":
+            tk.Label(parent_frame, text="素材価格と電気料金の管理", font=TK_FONT_BOLD, bg="#F5F5F5").pack(anchor="w", pady=(0, 15))
+            
+            form_frame = tk.Frame(parent_frame, bg="#F5F5F5")
+            form_frame.pack(fill=tk.BOTH, expand=True)
+
+            # Segment A: Electricity Cost Per Hour Setup
+            tk.Label(form_frame, text="電気料金単価 (円/時間):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=0, column=0, sticky="w", pady=5)
+            self.elec_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
+            self.elec_entry.insert(0, str(self.elec_cost_per_hour))
+            self.elec_entry.grid(row=0, column=1, sticky="w", padx=10, pady=5)
+            self.elec_entry.bind("<Button-1>", lambda e: self.show_edit_keyboard(e.widget))
+
+            # Segment B: Material Prices per KG Configurator Dropdown
+            tk.Label(form_frame, text="対象の素材:", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=1, column=0, sticky="w", pady=(20, 5))
+            self.cost_mat_combo = ttk.Combobox(form_frame, font=TK_FONT_REGULAR, width=13, state="readonly")
+            self.cost_mat_combo['values'] = tuple(self.load_materials())
+            if self.load_materials(): self.cost_mat_combo.current(0)
+            self.cost_mat_combo.grid(row=1, column=1, sticky="w", padx=10, pady=(20, 5))
+            self.cost_mat_combo.bind("<<ComboboxSelected>>", lambda e: self.on_cost_material_selected())
+
+            tk.Label(form_frame, text="素材単価 (円/kg):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=2, column=0, sticky="w", pady=5)
+            self.mat_price_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
+            self.mat_price_entry.grid(row=2, column=1, sticky="w", padx=10, pady=5)
+            self.mat_price_entry.bind("<Button-1>", lambda e: self.show_edit_keyboard(e.widget))
+            
+            # Fire sync action to pull item price to entry box automatically on load
+            self.on_cost_material_selected()
+
+            # Save Action Button dedicated to committing structural numbers
+            tk.Button(form_frame, text="料金設定を保存", font=TK_FONT_BOLD, bg="#5CB85C", fg="white", width=20, 
+                      command=self.save_pricing_action).grid(row=3, column=0, columnspan=2, pady=30, sticky="w")
+            return
+            
+        # --- STANDARD TEXT LIST UI FACTORY BLOCK ---
+        title_map = {
+            "class": "区分リストの編集", "material": "素材リストの編集",
+            "color": "色リストの編集", "maker": "製作者リストの編集"
+        }
         tk.Label(parent_frame, text=title_map.get(list_type, "リスト編集"), font=TK_FONT_BOLD, bg="#F5F5F5").pack(anchor="w", pady=(0, 10))
 
         layout_container = tk.Frame(parent_frame, bg="#F5F5F5")
@@ -786,20 +883,50 @@ class MyApp:
         ent.pack(anchor="w", pady=(5, 15))
         ent.bind("<Button-1>", lambda e: self.show_edit_keyboard(e.widget))
 
-        # Dynamically attach attributes and map callback targets
-        if list_type == "class":
-            self.class_listbox, self.class_entry = lbox, ent
-        elif list_type == "material":
-            self.mat_listbox, self.mat_entry = lbox, ent
-        elif list_type == "color":
-            self.color_listbox, self.color_entry = lbox, ent
-        elif list_type == "maker":
-            self.maker_listbox, self.maker_entry = lbox, ent
+        if list_type == "class": self.class_listbox, self.class_entry = lbox, ent
+        elif list_type == "material": self.mat_listbox, self.mat_entry = lbox, ent
+        elif list_type == "color": self.color_listbox, self.color_entry = lbox, ent
+        elif list_type == "maker": self.maker_listbox, self.maker_entry = lbox, ent
 
         tk.Button(control_frame, text="項目を追加", font=TK_FONT_BOLD, bg="#5CB85C", fg="white", width=14, command=lambda: self.add_item_action(list_type)).pack(fill=tk.X, pady=4)
         tk.Button(control_frame, text="選択項目を削除", font=TK_FONT_BOLD, bg="#D9534F", fg="white", width=14, command=lambda: self.remove_item_action(list_type)).pack(fill=tk.X, pady=4)
 
         self.refresh_list_views()
+
+    def on_cost_material_selected(self):
+        """Triggers whenever user changes material option dropdown inside cost management sub-tab."""
+        selected_mat = self.cost_mat_combo.get()
+        if not selected_mat: return
+        
+        # Look up price in app memory object; fall back to 0 if material is completely new
+        current_price = self.material_prices.get(selected_mat, 0)
+        self.mat_price_entry.delete(0, tk.END)
+        self.mat_price_entry.insert(0, str(current_price))
+
+    def save_pricing_action(self):
+        """Gathers text field values inside cost frame and flushes updates directly to config disk."""
+        try:
+            new_elec = int(self.elec_entry.get().strip())
+            selected_mat = self.cost_mat_combo.get()
+            new_price = int(self.mat_price_entry.get().strip())
+        except ValueError:
+            # Simple UI alert check safeguard against bad alphanumeric keys
+            self.result_label.config(text="エラー: 金額には半角数字を入力してください。") if hasattr(self, 'result_label') else None
+            return
+
+        # Commit directly back to app memory structures
+        self.elec_cost_per_hour = new_elec
+        if selected_mat:
+            self.material_prices[selected_mat] = new_price
+
+        # Compile data array and push straight to file
+        export_payload = {"electricity_per_hour": self.elec_cost_per_hour}
+        export_payload.update(self.material_prices)
+        self.save_pricing_config(export_payload)
+        
+        # Display feedback message safely if label exists
+        if hasattr(self, 'result_label'):
+            self.result_label.config(text="結果 : 料金設定を正常に保存しました。")
 
     def show_edit_keyboard(self, entry_widget):
         """Helper to ensure clicks change focus to the edit tab's specific keyboard helper."""
