@@ -46,6 +46,7 @@ class MyApp:
         self.setup_styles()
         self.setup_main_ui()
         self.load_history()
+        self.setup_edit_tab()
 
     def load_dept_database(self):
         db = {}
@@ -57,6 +58,84 @@ class MyApp:
                         'dept': row['DeptName'], 'room': row['RoomName'], 'group': row['GroupName']
                     }
         return db
+    
+    def load_classifications(self):
+        """Loads classifications from the text file. Defaults if file missing."""
+        import os
+        filename = "classification_list.txt"
+        default_list = ["内製化", "試作", "検討品", "品質", "改善"]
+        
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(default_list))
+            return default_list
+        
+        with open(filename, "r", encoding="utf-8") as f:
+            # Read lines and strip out invisible spaces/newlines
+            choices = [line.strip() for line in f if line.strip()]
+        return choices if choices else default_list
+
+    def save_classifications(self, choices):
+        """Saves the current classifications back to the text file."""
+        with open("classification_list.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(choices))
+
+    def load_materials(self):
+        """Loads materials from the text file. Defaults if file missing."""
+        import os
+        filename = "material_list.txt"
+        default_materials = ["PLA", "ABS", "PC", "PET-CF"]
+        
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(default_materials))
+            return default_materials
+        
+        with open(filename, "r", encoding="utf-8") as f:
+            choices = [line.strip() for line in f if line.strip()]
+        return choices if choices else default_materials
+    
+    def save_materials(self, materials):
+        """Saves the current materials list back to the text file."""
+        with open("material_list.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(materials))
+
+    def load_colors(self):
+        """Loads colors from the text file. Defaults if file missing."""
+        import os
+        filename = "color_list.txt"
+        default_colors = ["白", "黒", "赤", "青", "グレー"]
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(default_colors))
+            return default_colors
+        with open(filename, "r", encoding="utf-8") as f:
+            choices = [line.strip() for line in f if line.strip()]
+        return choices if choices else default_colors
+
+    def save_colors(self, colors):
+        """Saves the current colors list back to the text file."""
+        with open("color_list.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(colors))
+
+    def load_producers(self):
+        """Loads producers from the text file. Defaults if file missing."""
+        import os
+        filename = "producer_list.txt"
+        default_producers = ["担当A", "担当B", "担当C"]
+        if not os.path.exists(filename):
+            with open(filename, "w", encoding="utf-8") as f:
+                f.write("\n".join(default_producers))
+            return default_producers
+        with open(filename, "r", encoding="utf-8") as f:
+            choices = [line.strip() for line in f if line.strip()]
+        return choices if choices else default_producers
+
+    def save_producers(self, producers):
+        """Saves the current producers list back to the text file."""
+        with open("producer_list.txt", "w", encoding="utf-8") as f:
+            f.write("\n".join(producers))
+
 
     def setup_styles(self):
         style = ttk.Style()
@@ -137,7 +216,32 @@ class MyApp:
                 continue
 
             tk.Label(container, text=self.fields[key], bg=TAB_ACTIVE_BG, font=UI_CONFIG["label_font"]).grid(row=i, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
-            ent = tk.Entry(container, width=UI_CONFIG["entry_width"], font=UI_CONFIG["entry_font"])
+            
+            # --- FIXED LOOP CONDITION LOGIC ---
+            # --- UPDATED: Turning fields into Dropdowns dynamically ---
+            if key == "class":
+                ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
+                current_options = self.load_classifications()
+                ent['values'] = tuple(current_options)
+                if current_options: ent.current(0)
+            elif key == "filament":
+                ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
+                current_materials = self.load_materials()
+                ent['values'] = tuple(current_materials)
+                if current_materials: ent.current(0)
+            elif key == "color":
+                ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
+                current_colors = self.load_colors()
+                ent['values'] = tuple(current_colors)
+                if current_colors: ent.current(0)
+            elif key == "maker":
+                ent = ttk.Combobox(container, width=UI_CONFIG["entry_width"] - 3, font=UI_CONFIG["entry_font"], state="readonly")
+                current_producers = self.load_producers()
+                ent['values'] = tuple(current_producers)
+                if current_producers: ent.current(0)
+            else:
+                ent = tk.Entry(container, width=UI_CONFIG["entry_width"], font=UI_CONFIG["entry_font"])
+                
             ent.grid(row=i, column=1, sticky="w", padx=10)
             self.entries[key] = ent
 
@@ -158,10 +262,10 @@ class MyApp:
         self.entries["product"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["product"]))
         self.hour_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.hour_entry))
         self.min_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.min_entry))
-        self.entries["filament"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["filament"]))
+        # --- REMOVED HERE: The keyboard binding for self.entries["filament"] has been deleted ---
         self.entries["color"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["color"]))
         self.entries["weight"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["weight"]))
-        self.entries["class"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["class"]))
+        # --- REMOVED HERE: The keyboard binding for self.entries["class"] has been deleted ---
         self.entries["maker"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["maker"]))
         self.code_entry.bind("<Button-1>", lambda e: self.show_keyboard(self.code_entry))
 
@@ -270,7 +374,11 @@ class MyApp:
             messagebox.showerror("エラー", "CSVファイルが開かれています。閉じてからやり直してください。")
 
     def clear_inputs(self):
-        for e in self.entries.values(): e.delete(0, tk.END)
+        for key, e in self.entries.items():
+            if key == "class":
+                e.set("") # Safely clears a Combobox, or you can use e.current(0) to reset to default
+            else:
+                e.delete(0, tk.END)
         self.hour_entry.delete(0, tk.END)
         self.min_entry.delete(0, tk.END)
         self.code_var.set("")
@@ -607,10 +715,180 @@ class MyApp:
         tree.insert("", tk.END, values=("総合計", f"{grand_weight:.1f}g", f"¥{grand_cost:,.0f}"), tags=('total',))
         tree.tag_configure('total', background='#D1FFD1', font=(font_name_target, 10, "bold"))
 
+    def setup_edit_tab(self):
+        # Create a new frame container for the tab
+        self.edit_frame = tk.Frame(self.notebook, bg="#F5F5F5")
+        self.notebook.add(self.edit_frame, text=" リスト設定 ")
 
+        split_container = tk.Frame(self.edit_frame, bg="#F5F5F5")
+        split_container.pack(fill=tk.BOTH, expand=True)
 
+        left_pane = tk.Frame(split_container, bg="#F5F5F5", padx=20, pady=20)
+        left_pane.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
+        right_pane = tk.Frame(split_container, bg="#F5F5F5", padx=10, pady=10)
+        right_pane.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
 
+        # --- LEFT PANE SUB-TAB NOTEBOOK LAYOUT ---
+        self.sub_notebook = ttk.Notebook(left_pane)
+        self.sub_notebook.pack(fill=tk.BOTH, expand=True)
+
+        # Generate the 4 Configuration Frames
+        self.sub_class_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
+        self.sub_mat_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
+        self.sub_color_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
+        self.sub_maker_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
+
+        self.sub_notebook.add(self.sub_class_frame, text=" 区分設定 ")
+        self.sub_notebook.add(self.sub_mat_frame, text=" 素材設定 ")
+        self.sub_notebook.add(self.sub_color_frame, text=" 色設定 ")
+        self.sub_notebook.add(self.sub_maker_frame, text=" 製作者設定 ")
+
+        # Build UI onto frames using a type tracking tag ("class", "material", "color", "maker")
+        self.build_list_manager_ui(self.sub_class_frame, list_type="class")
+        self.build_list_manager_ui(self.sub_mat_frame, list_type="material")
+        self.build_list_manager_ui(self.sub_color_frame, list_type="color")
+        self.build_list_manager_ui(self.sub_maker_frame, list_type="maker")
+
+        # Set default focus field for keyboard to class input
+        self.edit_keyboard_ui = VirtualKeyboard(right_pane, self.class_entry)
+        self.edit_keyboard_ui.pack(fill=tk.BOTH, expand=True)
+
+    def build_list_manager_ui(self, parent_frame, list_type="class"):
+        """Cleaner factory method tracking list structures across 4 custom variations."""
+        title_map = {
+            "class": "区分リストの編集",
+            "material": "素材リストの編集",
+            "color": "色リストの編集",
+            "maker": "製作者リストの編集"
+        }
+        
+        tk.Label(parent_frame, text=title_map.get(list_type, "リスト編集"), font=TK_FONT_BOLD, bg="#F5F5F5").pack(anchor="w", pady=(0, 10))
+
+        layout_container = tk.Frame(parent_frame, bg="#F5F5F5")
+        layout_container.pack(fill=tk.BOTH, expand=True)
+
+        list_frame = tk.Frame(layout_container, bg="#F5F5F5")
+        list_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 15))
+
+        control_frame = tk.Frame(layout_container, bg="#F5F5F5")
+        control_frame.pack(side=tk.RIGHT, fill=tk.BOTH)
+
+        lbox = tk.Listbox(list_frame, font=TK_FONT_REGULAR, width=22, height=10)
+        lbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        scrollbar = tk.Scrollbar(list_frame, orient="vertical", command=lbox.yview)
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        lbox.config(yscrollcommand=scrollbar.set)
+
+        tk.Label(control_frame, text="新しく追加する項目:", font=TK_FONT_REGULAR, bg="#F5F5F5").pack(anchor="w")
+        ent = tk.Entry(control_frame, font=TK_FONT_REGULAR, width=18)
+        ent.pack(anchor="w", pady=(5, 15))
+        ent.bind("<Button-1>", lambda e: self.show_edit_keyboard(e.widget))
+
+        # Dynamically attach attributes and map callback targets
+        if list_type == "class":
+            self.class_listbox, self.class_entry = lbox, ent
+        elif list_type == "material":
+            self.mat_listbox, self.mat_entry = lbox, ent
+        elif list_type == "color":
+            self.color_listbox, self.color_entry = lbox, ent
+        elif list_type == "maker":
+            self.maker_listbox, self.maker_entry = lbox, ent
+
+        tk.Button(control_frame, text="項目を追加", font=TK_FONT_BOLD, bg="#5CB85C", fg="white", width=14, command=lambda: self.add_item_action(list_type)).pack(fill=tk.X, pady=4)
+        tk.Button(control_frame, text="選択項目を削除", font=TK_FONT_BOLD, bg="#D9534F", fg="white", width=14, command=lambda: self.remove_item_action(list_type)).pack(fill=tk.X, pady=4)
+
+        self.refresh_list_views()
+
+    def show_edit_keyboard(self, entry_widget):
+        """Helper to ensure clicks change focus to the edit tab's specific keyboard helper."""
+        if hasattr(self, 'edit_keyboard_ui'):
+            self.edit_keyboard_ui.current_entry = entry_widget
+
+    def refresh_list_views(self):
+        """Syncs all four data pools dynamically onto app interfaces."""
+        # 1. Classifications
+        if hasattr(self, 'class_listbox'):
+            self.class_listbox.delete(0, tk.END)
+            try:
+                classes = self.load_classifications()
+                for item in classes: self.class_listbox.insert(tk.END, item)
+                if hasattr(self, 'entries') and "class" in self.entries: self.entries["class"]['values'] = tuple(classes)
+            except AttributeError: pass
+
+        # 2. Materials
+        if hasattr(self, 'mat_listbox'):
+            self.mat_listbox.delete(0, tk.END)
+            try:
+                materials = self.load_materials()
+                for item in materials: self.mat_listbox.insert(tk.END, item)
+                if hasattr(self, 'entries') and "filament" in self.entries: self.entries["filament"]['values'] = tuple(materials)
+            except AttributeError: pass
+
+        # 3. Colors
+        if hasattr(self, 'color_listbox'):
+            self.color_listbox.delete(0, tk.END)
+            try:
+                colors = self.load_colors()
+                for item in colors: self.color_listbox.insert(tk.END, item)
+                if hasattr(self, 'entries') and "color" in self.entries: self.entries["color"]['values'] = tuple(colors)
+            except AttributeError: pass
+
+        # 4. Makers/Producers
+        if hasattr(self, 'maker_listbox'):
+            self.maker_listbox.delete(0, tk.END)
+            try:
+                producers = self.load_producers()
+                for item in producers: self.maker_listbox.insert(tk.END, item)
+                if hasattr(self, 'entries') and "maker" in self.entries: self.entries["maker"]['values'] = tuple(producers)
+            except AttributeError: pass
+
+def add_item_action(self, list_type):
+        entry_map = {"class": self.class_entry, "material": self.mat_entry, "color": self.color_entry, "maker": self.maker_entry}
+        entry_widget = entry_map[list_type]
+        new_text = entry_widget.get().strip()
+        if not new_text: return
+
+        if list_type == "class":
+            items = self.load_classifications()
+            if new_text not in items: items.append(new_text); self.save_classifications(items)
+        elif list_type == "material":
+            items = self.load_materials()
+            if new_text not in items: items.append(new_text); self.save_materials(items)
+        elif list_type == "color":
+            items = self.load_colors()
+            if new_text not in items: items.append(new_text); self.save_colors(items)
+        elif list_type == "maker":
+            items = self.load_producers()
+            if new_text not in items: items.append(new_text); self.save_producers(items)
+
+        self.refresh_list_views()
+        entry_widget.delete(0, tk.END)
+
+def remove_item_action(self, list_type):
+        lbox_map = {"class": self.class_listbox, "material": self.mat_listbox, "color": self.color_listbox, "maker": self.maker_listbox}
+        lbox_widget = lbox_map[list_type]
+        try:
+            selected_idx = lbox_widget.curselection()[0]
+            selected_text = lbox_widget.get(selected_idx)
+            
+            if list_type == "class":
+                items = self.load_classifications()
+                if selected_text in items: items.remove(selected_text); self.save_classifications(items)
+            elif list_type == "material":
+                items = self.load_materials()
+                if selected_text in items: items.remove(selected_text); self.save_materials(items)
+            elif list_type == "color":
+                items = self.load_colors()
+                if selected_text in items: items.remove(selected_text); self.save_colors(items)
+            elif list_type == "maker":
+                items = self.load_producers()
+                if selected_text in items: items.remove(selected_text); self.save_producers(items)
+
+            self.refresh_list_views()
+        except IndexError:
+            pass
 
 class VirtualKeyboard(tk.Frame):
     def __init__(self, parent, target_entry):

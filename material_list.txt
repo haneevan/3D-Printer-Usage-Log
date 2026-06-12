@@ -1,0 +1,4 @@
+PLA
+ABS
+PC
+PET-CF
