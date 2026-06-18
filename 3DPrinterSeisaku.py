@@ -825,12 +825,22 @@ class MyApp:
             form_frame = tk.Frame(parent_frame, bg="#F5F5F5")
             form_frame.pack(fill=tk.BOTH, expand=True)
 
+            # --- 1. Electricity Entry Box ---
             tk.Label(form_frame, text="電気料金単価 (円/時間):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=0, column=0, sticky="w", pady=5)
             self.elec_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
             self.elec_entry.insert(0, str(self.elec_cost_per_hour))
             self.elec_entry.grid(row=0, column=1, sticky="w", padx=10, pady=5)
-            self.elec_entry.bind("<Button-1>", lambda e: [self.elec_entry.delete(0, tk.END), self.show_edit_keyboard(self.elec_entry)])
+            
+            # Switch keyboard and select text on click
+            self.elec_entry.bind("<Button-1>", lambda e: [
+                self.show_edit_keyboard(self.elec_entry),
+                self.elec_entry.selection_range(0, tk.END),
+                self.elec_entry.icursor(tk.END)
+            ])
+            # FIXED: If left empty on focus out, restore original value
+            self.elec_entry.bind("<FocusOut>", lambda e: self.elec_entry.insert(0, str(self.elec_cost_per_hour)) if not self.elec_entry.get().strip() else None)
 
+            # --- Material Selector Dropdown ---
             tk.Label(form_frame, text="対象の素材:", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=1, column=0, sticky="w", pady=(20, 5))
             self.cost_mat_combo = ttk.Combobox(form_frame, font=TK_FONT_REGULAR, width=13, state="readonly")
             self.cost_mat_combo['values'] = tuple(self.load_materials())
@@ -838,10 +848,19 @@ class MyApp:
             self.cost_mat_combo.grid(row=1, column=1, sticky="w", padx=10, pady=(20, 5))
             self.cost_mat_combo.bind("<<ComboboxSelected>>", lambda e: self.on_cost_material_selected())
 
+            # --- 2. Material Price Entry Box ---
             tk.Label(form_frame, text="素材単価 (円/kg):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=2, column=0, sticky="w", pady=5)
             self.mat_price_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
             self.mat_price_entry.grid(row=2, column=1, sticky="w", padx=10, pady=5)
-            self.mat_price_entry.bind("<Button-1>", lambda e: [self.mat_price_entry.delete(0, tk.END), self.show_edit_keyboard(self.mat_price_entry)])
+            
+            # Switch keyboard and select text on click
+            self.mat_price_entry.bind("<Button-1>", lambda e: [
+                self.show_edit_keyboard(self.mat_price_entry),
+                self.mat_price_entry.selection_range(0, tk.END),
+                self.mat_price_entry.icursor(tk.END)
+            ])
+            # FIXED: If left empty on focus out, restore original value for selected material
+            self.mat_price_entry.bind("<FocusOut>", lambda e: self.restore_empty_material_price())
             
             self.on_cost_material_selected()
 
@@ -894,6 +913,14 @@ class MyApp:
         tk.Button(control_frame, text="選択項目を削除", font=TK_FONT_BOLD, bg="#D9534F", fg="white", width=14, command=lambda t=list_type: self.remove_item_action(t)).pack(fill=tk.X, pady=4)
 
         self.refresh_list_views()
+
+    def restore_empty_material_price(self):
+        """Restores the saved configuration price if the field is left completely empty."""
+        if not self.mat_price_entry.get().strip():
+            selected_mat = self.cost_mat_combo.get()
+            if selected_mat and selected_mat in self.material_prices:
+                saved_price = self.material_prices[selected_mat]
+                self.mat_price_entry.insert(0, str(saved_price))
 
     def on_cost_material_selected(self):
         """Triggers whenever user changes material option dropdown inside cost management sub-tab."""
