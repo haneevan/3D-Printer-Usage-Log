@@ -219,9 +219,6 @@ class MyApp:
             "label_font": TK_FONT_BOLD,
             "entry_font": TK_FONT_REGULAR
         }
-        
-        from tkcalendar import DateEntry
-        from datetime import datetime
 
         # Main split container for input form (left) and keyboard (right)
         split_container = tk.Frame(self.input_frame, bg=TAB_ACTIVE_BG)
@@ -321,6 +318,8 @@ class MyApp:
         self.save_button = tk.Button(container, text="データ保存", command=self.save_data, bg="#5CB85C", fg="white", width=30, font=TK_FONT_BOLD)
         self.save_button.grid(row=10, column=0, columnspan=2, pady=20)
         
+        self.cancel_button = tk.Button(container, text="編集をキャンセル", font=TK_FONT_BOLD, bg="#FA0000", fg="white", command=self.cancel_edit_action, width=30)
+
         # --- CLEANED KEYPAD BINDINGS ---
         # Bound ONLY to writable text fields. Dropped dropdown menus and the calendar component.
         self.entries["product"].bind("<Button-1>", lambda e: self.show_keyboard(self.entries["product"]))
@@ -430,6 +429,7 @@ class MyApp:
             messagebox.showinfo("成功", "データを保存しました。")
             self.load_history()
             self.clear_inputs()
+            self.cancel_button.grid_forget()
         except PermissionError:
             messagebox.showerror("エラー", "CSVファイルが開かれています。閉じてからやり直してください。")
 
@@ -444,7 +444,7 @@ class MyApp:
         self.code_var.set("")
         self.date_entry.delete(0, tk.END)
         self.date_entry.insert(0, "YYYY/MM/DD (空欄で今日)")
-        self.date_entry.config(fg="grey")
+        #self.date_entry.config(fg="grey")
         self.save_button.config(text="データ保存", bg="#5CB85C")
         self.editing_row_data = None
 
@@ -481,26 +481,32 @@ class MyApp:
         if not sel:
             messagebox.showwarning("警告", "編集する行を選択してください。")
             return
+
         vals = self.tree.item(sel[0])['values']
         self.clear_inputs()
         self.editing_row_data = [str(v) for v in vals]
         
+        # --- Standard Text/Date Entries ---
         self.date_entry.delete(0, tk.END)
         self.date_entry.insert(0, vals[0])
-        self.date_entry.config(fg="black")
         self.entries["product"].insert(0, vals[1])
 
+        # --- Time Parse Logic ---
         time_str = str(vals[2])
         parts = time_str.split()
         self.hour_entry.insert(0, parts[0] if len(parts) > 0 else "0")
         self.min_entry.insert(0, parts[2] if len(parts) > 2 else "0")
         
-        self.entries["filament"].insert(0, vals[3])
-        self.entries["color"].insert(0, vals[4])
+        # --- Weight Text Entry ---
         self.entries["weight"].insert(0, str(vals[5]).replace(" g", ""))
-        self.entries["class"].insert(0, vals[6])
-        self.entries["maker"].insert(0, vals[7])
         
+        # --- FIXED: Use .set() instead of .insert() for all your Dropdown/Comboboxes ---
+        self.entries["filament"].set(vals[3])
+        self.entries["color"].set(vals[4])
+        self.entries["class"].set(vals[6])   # This fixes the blank 区分 bug!
+        self.entries["maker"].set(vals[7])
+        
+        # --- Department Code Matching ---
         for code, info in self.dept_db.items():
             if info['dept'] == vals[8] and info['room'] == vals[9]:
                 self.code_var.set(code)
@@ -508,6 +514,7 @@ class MyApp:
         
         self.notebook.select(0)
         self.save_button.config(text="更新を保存", bg="#0275D8")
+        self.cancel_button.grid(row=11, column=0, columnspan=2, pady=(10, 0))
 
     def delete_entry(self):
         sel = self.tree.selection()
@@ -1065,6 +1072,18 @@ class MyApp:
             
         self.refresh_list_views()
         messagebox.showinfo("成功", "選択した項目を削除しました。")
+    
+    def cancel_edit_action(self):
+        """Discards active edits, resets input form, and hides the cancel button."""
+        # 1. Flush the inputs back to safe defaults
+        self.clear_inputs()
+        # 2. Clear the active edit row pointer data tracking reference
+        self.editing_row_data = None
+        # 3. Change your blue save button back to green default insert mode
+        self.save_button.config(text="データ保存", bg="#5CB85C")
+        # 4. Hide the cancel button from the screen view
+        self.cancel_button.grid_forget()
+        messagebox.showinfo("案内", "編集をキャンセルしました。")
 
 class VirtualKeyboard(tk.Frame):
     def __init__(self, parent, target_entry):
