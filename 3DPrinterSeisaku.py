@@ -31,7 +31,7 @@ TAB_ACTIVE_BG = "white"
 class MyApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("3D プリンタ 製作記録")
+        self.root.title("3Dプリンター 製作記録")
         self.root.geometry("1150x850") 
         self.root.configure(bg=BG_COLOR)
         
@@ -190,7 +190,7 @@ class MyApp:
     def setup_main_ui(self):
         header = tk.Frame(self.root, bg=HEADER_COLOR, height=60)
         header.pack(fill=tk.X)
-        tk.Label(header, text="3D プリンタ 製作記録", font=TK_FONT_HEADER, fg="white", bg=HEADER_COLOR).pack(expand=True)
+        tk.Label(header, text="3Dプリンター 製作記録", font=TK_FONT_HEADER, fg="white", bg=HEADER_COLOR).pack(expand=True)
 
         self.notebook = ttk.Notebook(self.root)
         self.notebook.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
@@ -1157,8 +1157,8 @@ class VirtualKeyboard(tk.Frame):
         action_frame.pack(fill=tk.X, padx=10, pady=(0, 10))
         
         tk.Button(action_frame, text="⌫", font=("Arial", 12, "bold"), height=2, command=self.backspace).pack(side="left", expand=True, fill="both", padx=2)
-        tk.Button(action_frame, text="クリア (Clear)", font=("Arial", 11, "bold"), height=2, bg="#FFCDD2", command=self.clear_field).pack(side="left", expand=True, fill="both", padx=2)
-        tk.Button(action_frame, text="日本語 (Space)", font=("Arial", 12), height=2, command=lambda: self.insert_text(" ")).pack(side="left", expand=True, fill="both", padx=10)
+        tk.Button(action_frame, text="クリア", font=("Arial", 11, "bold"), height=2, bg="#FFCDD2", command=self.clear_field).pack(side="left", expand=True, fill="both", padx=2)
+        tk.Button(action_frame, text="スペース", font=("Arial", 12), height=2, command=lambda: self.insert_text(" ")).pack(side="left", expand=True, fill="both", padx=10)
         tk.Button(action_frame, text="↵", font=("Arial", 12, "bold"), height=2, command=self.clear_handwriting).pack(side="left", expand=True, fill="both", padx=2)
 
     def build_tab_2_qwerty(self):
@@ -1180,7 +1180,7 @@ class VirtualKeyboard(tk.Frame):
                 elif key == 'Space':
                     btn = tk.Button(frame, text="", width=30, height=2, font=("Arial", 11), command=lambda: self.insert_text(" "))
                 elif key == 'Clear':
-                    btn = tk.Button(frame, text="Clear", width=10, height=2, font=("Arial", 11), bg="#FFCDD2", command=self.clear_field)
+                    btn = tk.Button(frame, text="クリア", width=10, height=2, font=("Arial", 11), bg="#FFCDD2", command=self.clear_field)
                 elif key == '⇧':
                     btn = tk.Button(frame, text=key, width=6, height=2, font=("Arial", 11), command=self.toggle_shift)
                 elif key == 'Ctrl + Alt':
@@ -1295,4 +1295,5 @@ class VirtualKeyboard(tk.Frame):
 if __name__ == "__main__":
     root = tk.Tk()
     app = MyApp(root)
+    root.attributes('-zoomed',True)
     root.mainloop()
