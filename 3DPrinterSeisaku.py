@@ -13,6 +13,11 @@ except ImportError:
 import json
 from tkcalendar import DateEntry
 
+# --- Helper Function for SQL-compatible non-padded dates ---
+def format_custom_date(dt_obj):
+    """Formats datetime object to YYYY/M/D (e.g., 2026/7/5 instead of 2026/07/05)."""
+    return f"{dt_obj.year}/{dt_obj.month}/{dt_obj.day}"
+
 # --- Font Fallback Configurations ---
 import matplotlib
 matplotlib.rcParams['font.family'] = ['MS Gothic', 'IPAexGothic', 'Noto Sans CJK JP', 'sans-serif']
@@ -51,10 +56,8 @@ class MyApp:
         self.load_history()
         self.setup_edit_tab()
 
-
     def load_pricing_config(self):
         """Loads material prices per kg and electricity cost from disk. Uses defaults if missing."""
-        import os
         filename = "pricing_config.txt"
         defaults = {
             "PLA": "2800",
@@ -79,7 +82,6 @@ class MyApp:
                         pricing[k] = int(v)
                     except ValueError:
                         pricing[k] = 0
-        
         # Ensure fallback defaults exist if keys were missing or broken in file
         for k, v in defaults.items():
             if k not in pricing:
@@ -105,7 +107,6 @@ class MyApp:
     
     def load_classifications(self):
         """Loads classifications from the text file. Defaults if file missing."""
-        import os
         filename = "classification_list.txt"
         default_list = ["内製化", "試作", "検討品", "品質", "改善"]
         
@@ -126,7 +127,6 @@ class MyApp:
 
     def load_materials(self):
         """Loads materials from the text file. Defaults if file missing."""
-        import os
         filename = "material_list.txt"
         default_materials = ["PLA", "ABS", "PC", "PET-CF"]
         
@@ -146,7 +146,6 @@ class MyApp:
 
     def load_colors(self):
         """Loads colors from the text file. Defaults if file missing."""
-        import os
         filename = "color_list.txt"
         default_colors = ["白", "黒", "赤", "青", "グレー"]
         if not os.path.exists(filename):
@@ -164,7 +163,6 @@ class MyApp:
 
     def load_producers(self):
         """Loads producers from the text file. Defaults if file missing."""
-        import os
         filename = "producer_list.txt"
         default_producers = ["担当A", "担当B", "担当C"]
         if not os.path.exists(filename):
@@ -179,7 +177,6 @@ class MyApp:
         """Saves the current producers list back to the text file."""
         with open("producer_list.txt", "w", encoding="utf-8") as f:
             f.write("\n".join(producers))
-
 
     def setup_styles(self):
         style = ttk.Style()
@@ -219,7 +216,6 @@ class MyApp:
             "label_font": TK_FONT_BOLD,
             "entry_font": TK_FONT_REGULAR
         }
-
         # Main split container for input form (left) and keyboard (right)
         split_container = tk.Frame(self.input_frame, bg=TAB_ACTIVE_BG)
         split_container.pack(fill=tk.BOTH, expand=True)
@@ -239,7 +235,6 @@ class MyApp:
             "color": "色:", "weight": "使用量 (g):", "class": "区分:", "maker": "製作者:"
         }
         self.entries = {}
-        
         # --- FIXED ROW MAP: Unifies "date" loop creation at row index 0 ---
         row_map = ["date", "product", "time_placeholder", "filament", "color", "weight", "class", "maker"]
         
@@ -257,10 +252,8 @@ class MyApp:
                 self.min_entry.pack(side=tk.LEFT)
                 tk.Label(time_frame, text=" m", bg=TAB_ACTIVE_BG, font=UI_CONFIG["entry_font"]).pack(side=tk.LEFT)
                 continue
-
             # Standard Label Generation
             tk.Label(container, text=self.fields[key], bg=TAB_ACTIVE_BG, font=UI_CONFIG["label_font"]).grid(row=i, column=0, sticky="w", pady=UI_CONFIG["row_padding"])
-            
             # --- FIXED SELECTION STRUCT (if / elif / else chain) ---
             if key == "date":
                 ent = DateEntry(
@@ -387,8 +380,27 @@ class MyApp:
             messagebox.showerror("エラー", "有効な部署コードを入力してください。")
             return
 
-        input_date = self.date_entry.get().strip()
-        date = input_date if input_date and "YYYY" not in input_date else datetime.now().strftime("%Y/%m/%d")
+        # --- DATE FORMAT FIX: Formats to YYYY/M/D (no leading zero) ---
+        try:
+            if isinstance(self.date_entry, DateEntry):
+                selected_dt = self.date_entry.get_date()
+                date = format_custom_date(selected_dt)
+            else:
+                input_date = self.date_entry.get().strip()
+                if input_date and "YYYY" not in input_date:
+                    dt_parsed = datetime.strptime(input_date, "%Y/%m/%d")
+                    date = format_custom_date(dt_parsed)
+                else:
+                    date = format_custom_date(datetime.now())
+        except Exception:
+            # Fallback to direct string conversion with zero-stripping if custom parse fails
+            raw = self.date_entry.get().strip()
+            parts = raw.split("/")
+            if len(parts) == 3:
+                date = f"{parts[0]}/{int(parts[1])}/{int(parts[2])}"
+            else:
+                date = format_custom_date(datetime.now())
+
         h = self.hour_entry.get().strip() or "0"
         m = self.min_entry.get().strip() or "0"
         formatted_time = f"{h} h {m} m"
@@ -436,15 +448,17 @@ class MyApp:
     def clear_inputs(self):
         for key, e in self.entries.items():
             if key == "class":
-                e.set("") # Safely clears a Combobox, or you can use e.current(0) to reset to default
+                e.set("") 
+            elif key == "date":
+                if isinstance(e, DateEntry):
+                    e.set_date(datetime.now())
+                else:
+                    e.delete(0, tk.END)
             else:
                 e.delete(0, tk.END)
         self.hour_entry.delete(0, tk.END)
         self.min_entry.delete(0, tk.END)
         self.code_var.set("")
-        self.date_entry.delete(0, tk.END)
-        self.date_entry.insert(0, "YYYY/MM/DD (空欄で今日)")
-        #self.date_entry.config(fg="grey")
         self.save_button.config(text="データ保存", bg="#5CB85C")
         self.editing_row_data = None
 
@@ -486,9 +500,21 @@ class MyApp:
         self.clear_inputs()
         self.editing_row_data = [str(v) for v in vals]
         
-        # --- Standard Text/Date Entries ---
-        self.date_entry.delete(0, tk.END)
-        self.date_entry.insert(0, vals[0])
+        # --- Date Field parsing with non-zero padded format ---
+        try:
+            parts = str(vals[0]).split("/")
+            if len(parts) == 3:
+                parsed_dt = datetime(int(parts[0]), int(parts[1]), int(parts[2]))
+                if isinstance(self.date_entry, DateEntry):
+                    self.date_entry.set_date(parsed_dt)
+                else:
+                    self.date_entry.delete(0, tk.END)
+                    self.date_entry.insert(0, format_custom_date(parsed_dt))
+        except Exception:
+            if not isinstance(self.date_entry, DateEntry):
+                self.date_entry.delete(0, tk.END)
+                self.date_entry.insert(0, vals[0])
+
         self.entries["product"].insert(0, vals[1])
 
         # --- Time Parse Logic ---
@@ -496,16 +522,13 @@ class MyApp:
         parts = time_str.split()
         self.hour_entry.insert(0, parts[0] if len(parts) > 0 else "0")
         self.min_entry.insert(0, parts[2] if len(parts) > 2 else "0")
-        
         # --- Weight Text Entry ---
         self.entries["weight"].insert(0, str(vals[5]).replace(" g", ""))
-        
         # --- FIXED: Use .set() instead of .insert() for all your Dropdown/Comboboxes ---
         self.entries["filament"].set(vals[3])
         self.entries["color"].set(vals[4])
-        self.entries["class"].set(vals[6])   # This fixes the blank 区分 bug!
+        self.entries["class"].set(vals[6])  
         self.entries["maker"].set(vals[7])
-        
         # --- Department Code Matching ---
         for code, info in self.dept_db.items():
             if info['dept'] == vals[8] and info['room'] == vals[9]:
@@ -795,59 +818,49 @@ class MyApp:
 
         right_pane = tk.Frame(split_container, bg="#F5F5F5", padx=10, pady=10)
         right_pane.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
-
         # --- LEFT PANE SUB-TAB NOTEBOOK LAYOUT ---
         self.sub_notebook = ttk.Notebook(left_pane)
         self.sub_notebook.pack(fill=tk.BOTH, expand=True)
 
-        # Setup Five Sub-Frames (Added Cost Panel)
         self.sub_class_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_mat_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_color_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
         self.sub_maker_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10)
-        self.sub_cost_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10) # <-- New!
+        self.sub_cost_frame = tk.Frame(self.sub_notebook, bg="#F5F5F5", pady=10) 
 
         self.sub_notebook.add(self.sub_class_frame, text=" 区分設定 ")
         self.sub_notebook.add(self.sub_mat_frame, text=" 素材設定 ")
         self.sub_notebook.add(self.sub_color_frame, text=" 色設定 ")
         self.sub_notebook.add(self.sub_maker_frame, text=" 製作者設定 ")
-        self.sub_notebook.add(self.sub_cost_frame, text=" コスト設定 ") # <-- New!
+        self.sub_notebook.add(self.sub_cost_frame, text=" コスト設定 ") 
 
-        # Build UI onto frames using type tracking flags
         self.build_list_manager_ui(self.sub_class_frame, list_type="class")
         self.build_list_manager_ui(self.sub_mat_frame, list_type="material")
         self.build_list_manager_ui(self.sub_color_frame, list_type="color")
         self.build_list_manager_ui(self.sub_maker_frame, list_type="maker")
-        self.build_list_manager_ui(self.sub_cost_frame, list_type="cost") # <-- New!
+        self.build_list_manager_ui(self.sub_cost_frame, list_type="cost") 
 
-        # Set default focus field for keyboard to class input
         self.edit_keyboard_ui = VirtualKeyboard(right_pane, self.class_entry)
         self.edit_keyboard_ui.pack(fill=tk.BOTH, expand=True)
 
     def build_list_manager_ui(self, parent_frame, list_type="class"):
-        """Factory method structural pattern modified to handle core text logs and numeric cost management."""
-        
         if list_type == "cost":
             tk.Label(parent_frame, text="素材価格と電気料金の管理", font=TK_FONT_BOLD, bg="#F5F5F5").pack(anchor="w", pady=(0, 15))
             form_frame = tk.Frame(parent_frame, bg="#F5F5F5")
             form_frame.pack(fill=tk.BOTH, expand=True)
 
-            # --- 1. Electricity Entry Box ---
             tk.Label(form_frame, text="電気料金単価 (円/時間):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=0, column=0, sticky="w", pady=5)
             self.elec_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
             self.elec_entry.insert(0, str(self.elec_cost_per_hour))
             self.elec_entry.grid(row=0, column=1, sticky="w", padx=10, pady=5)
             
-            # Switch keyboard and select text on click
             self.elec_entry.bind("<Button-1>", lambda e: [
                 self.show_edit_keyboard(self.elec_entry),
                 self.elec_entry.selection_range(0, tk.END),
                 self.elec_entry.icursor(tk.END)
             ])
-            # FIXED: If left empty on focus out, restore original value
             self.elec_entry.bind("<FocusOut>", lambda e: self.elec_entry.insert(0, str(self.elec_cost_per_hour)) if not self.elec_entry.get().strip() else None)
 
-            # --- Material Selector Dropdown ---
             tk.Label(form_frame, text="対象の素材:", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=1, column=0, sticky="w", pady=(20, 5))
             self.cost_mat_combo = ttk.Combobox(form_frame, font=TK_FONT_REGULAR, width=13, state="readonly")
             self.cost_mat_combo['values'] = tuple(self.load_materials())
@@ -855,18 +868,15 @@ class MyApp:
             self.cost_mat_combo.grid(row=1, column=1, sticky="w", padx=10, pady=(20, 5))
             self.cost_mat_combo.bind("<<ComboboxSelected>>", lambda e: self.on_cost_material_selected())
 
-            # --- 2. Material Price Entry Box ---
             tk.Label(form_frame, text="素材単価 (円/kg):", font=TK_FONT_REGULAR, bg="#F5F5F5").grid(row=2, column=0, sticky="w", pady=5)
             self.mat_price_entry = tk.Entry(form_frame, font=TK_FONT_REGULAR, width=15)
             self.mat_price_entry.grid(row=2, column=1, sticky="w", padx=10, pady=5)
             
-            # Switch keyboard and select text on click
             self.mat_price_entry.bind("<Button-1>", lambda e: [
                 self.show_edit_keyboard(self.mat_price_entry),
                 self.mat_price_entry.selection_range(0, tk.END),
                 self.mat_price_entry.icursor(tk.END)
             ])
-            # FIXED: If left empty on focus out, restore original value for selected material
             self.mat_price_entry.bind("<FocusOut>", lambda e: self.restore_empty_material_price())
             
             self.on_cost_material_selected()
@@ -884,7 +894,6 @@ class MyApp:
         layout_container = tk.Frame(parent_frame, bg="#F5F5F5")
         layout_container.pack(fill=tk.BOTH, expand=True)
 
-        # FIXED FRAME PACKING: Control frame packed first to claim its right-side real estate
         control_frame = tk.Frame(layout_container, bg="#F5F5F5")
         control_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=(15, 0))
 
@@ -903,14 +912,12 @@ class MyApp:
         ent.pack(anchor="w", pady=(5, 15))
         ent.bind("<Button-1>", lambda e: self.show_edit_keyboard(e.widget))
 
-        # Dynamically save references to class properties using unified naming arrays
         if not hasattr(self, 'list_entries'): self.list_entries = {}
         if not hasattr(self, 'list_boxes'): self.list_boxes = {}
         
         self.list_entries[list_type] = ent
         self.list_boxes[list_type] = lbox
 
-        # Backward compatibility tracking hooks
         if list_type == "class": self.class_listbox, self.class_entry = lbox, ent
         elif list_type == "material": self.mat_listbox, self.mat_entry = lbox, ent
         elif list_type == "color": self.color_listbox, self.color_entry = lbox, ent
@@ -1016,7 +1023,7 @@ class MyApp:
         
         new_text = entry_widget.get().strip()
         if not new_text: return
-        
+
         # Pull existing entries depending on mode
         if list_type == "class":
             items = self.load_classifications()
@@ -1142,7 +1149,7 @@ class VirtualKeyboard(tk.Frame):
         self.suggestion_frame = tk.Frame(self.tab_jp, bg="#F5F5F5")
         self.suggestion_frame.pack(fill=tk.X, padx=10, pady=5)
         self.suggestion_buttons = []
-        
+
         # Create 8 placeholder buttons for suggestions
         for i in range(8):
             btn = tk.Button(self.suggestion_frame, text="", font=("MS Gothic", 14, "bold"), 
@@ -1284,7 +1291,7 @@ class VirtualKeyboard(tk.Frame):
             if current_text:
                 # Find out where the typing cursor currently is
                 cursor_pos = self.target_entry.index(tk.INSERT)
-                
+
                 if cursor_pos > 0:
                     # Delete the character right before the cursor
                     self.target_entry.delete(cursor_pos - 1, cursor_pos)
@@ -1295,5 +1302,5 @@ class VirtualKeyboard(tk.Frame):
 if __name__ == "__main__":
     root = tk.Tk()
     app = MyApp(root)
-    root.attributes('-zoomed',True)
+    root.attributes('-zoomed', True)
     root.mainloop()
